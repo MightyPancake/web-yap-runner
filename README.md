@@ -101,3 +101,22 @@ This is meaningfully more isolated than plain `ulimit` alone, but it's still one
 mount namespace away from the host rather than a VM — treat it as solid for
 trusted/semi-trusted use, and add a stronger boundary (a container, nsjail, or gVisor)
 if this is ever exposed to fully untrusted/adversarial callers at scale.
+
+## Notes on public exposure
+
+This is meant to be called directly from a static site's client-side JS (no backend
+of its own, e.g. GitHub Pages), which rules out an API key as real access control —
+anything shipped to the browser is public too. So instead:
+
+- **CORS allowlist** (`YAP_CORS_ORIGIN`, default `https://giorgio.nullptr.free`):
+  blocks *other* sites' browser JS from calling this directly. Doesn't stop a direct
+  curl/script — CORS is enforced by browsers, not the server — just raises the bar on
+  casual drive-by use.
+- **Per-IP rate limiting** (`YAP_RATE_LIMIT_WINDOW_MS`/`YAP_RATE_LIMIT_MAX`, default 20
+  requests/min): the real abuse control. Returns `429` past the limit.
+- **Global concurrency cap** (`YAP_MAX_CONCURRENT_RUNS`, default 4): every request
+  compiles and runs native code — real CPU/memory cost regardless of how many distinct
+  IPs it's spread across. Returns `503` past the cap.
+- `app.set('trust proxy', true)` is on, so the rate limiter keys off the real client IP
+  from `X-Forwarded-For` — fine behind a reverse proxy you control, but means an
+  untrusted proxy in the chain could let a caller spoof their own rate-limit key.

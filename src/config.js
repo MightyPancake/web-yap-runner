@@ -62,4 +62,17 @@ export const config = {
   maxFiles: intFromEnv('YAP_MAX_FILES', 32),
   maxFlags: intFromEnv('YAP_MAX_FLAGS', 32),
   jsonBodyLimit: process.env.YAP_JSON_BODY_LIMIT || '4mb',
+
+  // The caller is a static site (GitHub Pages) calling this API directly
+  // from browser JS, so any embedded secret would be public too — an API
+  // key would be theater, not a real access control. What actually bounds
+  // abuse here: a CORS allowlist (stops *other* sites' browser JS from
+  // calling this directly; doesn't stop non-browser clients, but raises the
+  // bar for casual drive-by use), per-IP rate limiting, and a global
+  // concurrency cap (each request compiles+runs native code, which is real
+  // CPU/memory cost regardless of how many distinct IPs it comes from).
+  corsOrigin: process.env.YAP_CORS_ORIGIN || 'https://giorgio.nullptr.free',
+  rateLimitWindowMs: intFromEnv('YAP_RATE_LIMIT_WINDOW_MS', 60_000),
+  rateLimitMax: intFromEnv('YAP_RATE_LIMIT_MAX', 20),
+  maxConcurrentRuns: intFromEnv('YAP_MAX_CONCURRENT_RUNS', 4),
 };
