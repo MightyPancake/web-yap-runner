@@ -3,6 +3,8 @@
 A small REST API that compiles and runs [yap](https://github.com/mightypancake/yap)
 programs.
 
+## Warning - this was vibed!
+
 ## Setup
 
 ```sh
@@ -11,7 +13,7 @@ npm install
 npm start
 ```
 
-By default the server runs `./yap_compiler` (a copy of the `yap` binary, gitignored
+By default, the server runs `./yap_compiler` (a copy of the `yap` binary, gitignored
 since it's a machine-specific release build) with `YAP_HOME` pointed at `~/yap`. Both
 are overridable via the `YAP_BIN` and `YAP_HOME` env vars. See `src/config.js` for
 every other tunable (timeouts, resource limits, output caps).
@@ -21,7 +23,7 @@ The server refuses to start with sandboxing on (the default) if `bwrap` isn't ru
 if you understand the tradeoff (see "Notes on isolation" below).
 
 `yap` requires a build of `~/yap` with the `YAP_HOME`-env-var fallback in
-`yap_get_yap_home_path()` (`src/compiler.c`) — without it, the binary locates its
+`yap_get_yap_home_path()` (`src/compiler.c`). Without it, the binary locates its
 `components/`/`modules/`/`lib/` relative to its own on-disk path instead, so it would
 need to live inside a full `~/yap` checkout rather than being copied out standalone.
 To (re)build and refresh the copy after pulling yap changes:
