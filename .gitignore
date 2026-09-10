@@ -1,0 +1,4 @@
+node_modules/
+*.log
+a.out
+/yap_compiler

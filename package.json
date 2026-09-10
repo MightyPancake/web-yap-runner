@@ -1,0 +1,16 @@
+{
+  "name": "web-yap-runner",
+  "version": "1.0.0",
+  "description": "REST API that compiles and runs yap programs",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
