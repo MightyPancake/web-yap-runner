@@ -53,6 +53,15 @@ export function sandboxCommand(cmd, args, { workDir, roBinds = [] }) {
     '--ro-bind', '/nix', '/nix',
     '--ro-bind-try', '/etc', '/etc',
     '--ro-bind-try', '/bin', '/bin',
+    // /lib, /lib64 and /usr do not exist on NixOS (hence -try), but the guest
+    // image the in-VM deployment runs on is a normal FHS distro whose /bin/sh
+    // is dynamically linked against a loader under /lib. Without them that
+    // shell cannot exec at all, and TCC's include-path discovery — which goes
+    // through popen(), i.e. /bin/sh — silently yields no paths, surfacing as
+    // "include file 'stdint.h' not found".
+    '--ro-bind-try', '/lib', '/lib',
+    '--ro-bind-try', '/lib64', '/lib64',
+    '--ro-bind-try', '/usr', '/usr',
     ...(HAS_ETC_NIXOS ? ['--tmpfs', '/etc/nixos'] : []),
   ];
   for (const p of roBinds) {
