@@ -1,4 +1,11 @@
+import fs from 'node:fs';
 import { config } from './config.js';
+
+// `--tmpfs <dir>` needs the directory to exist inside the sandbox, and /etc is
+// bound read-only, so bwrap cannot create it. On a host without /etc/nixos
+// (e.g. the minimal guest image the in-VM deployment uses) there is nothing to
+// mask in the first place.
+const HAS_ETC_NIXOS = fs.existsSync('/etc/nixos');
 
 /**
  * Builds a bubblewrap invocation that isolates `cmd`/`args` into fresh
@@ -46,7 +53,7 @@ export function sandboxCommand(cmd, args, { workDir, roBinds = [] }) {
     '--ro-bind', '/nix', '/nix',
     '--ro-bind-try', '/etc', '/etc',
     '--ro-bind-try', '/bin', '/bin',
-    '--tmpfs', '/etc/nixos',
+    ...(HAS_ETC_NIXOS ? ['--tmpfs', '/etc/nixos'] : []),
   ];
   for (const p of roBinds) {
     bwrapArgs.push('--ro-bind', p, p);
