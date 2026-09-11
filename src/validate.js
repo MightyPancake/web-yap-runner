@@ -11,7 +11,19 @@ export class ValidationError extends Error {}
 // arbitrary "components/<name>/lib*.so" to dlopen (path traversal into
 // arbitrary shared libraries), and -bc emits C instead of a binary (caught
 // separately after compilation, since it exits 0 with no binary produced).
-const ALLOWED_FLAG_RE = /^(-b\S+|-f\S*|--backend-flag=.+|--frontend-flag=.+)$/;
+//
+// Flag *values* are restricted to a safe character set, not just "no
+// whitespace": yap forwards -bf=/-ff=/--backend-flag=/--frontend-flag=
+// values into its backend compiler invocation via a shell rather than a
+// plain execve argv, so `\S+`/`.+` let shell metacharacters through —
+// confirmed exploitable with `-bf=$(cat${IFS}/etc/passwd>&2)`, which reads
+// arbitrary sandbox-visible files (no literal space needed, `${IFS}`
+// expands to one). This isn't a bug we can fix in yap's C source from here,
+// so the flag value itself must never contain shell syntax.
+const SAFE_CHARS = '[A-Za-z0-9_.,+=/-]';
+const ALLOWED_FLAG_RE = new RegExp(
+  `^(-b${SAFE_CHARS}+|-f${SAFE_CHARS}*|--backend-flag=${SAFE_CHARS}+|--frontend-flag=${SAFE_CHARS}+)$`,
+);
 
 function isPlainObject(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
