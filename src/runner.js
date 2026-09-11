@@ -73,18 +73,24 @@ export async function runYapProgram({ files, entry, input, flags }) {
       roBinds: [config.yapHome, config.yapBin],
     });
 
+    const compileStart = performance.now();
     const compile = await runCapture(sandboxedCompile.cmd, sandboxedCompile.args, {
       cwd: workDir,
       env: { ...process.env, YAP_HOME: config.yapHome },
       timeoutMs: config.compileTimeoutMs,
       maxBytes: config.maxOutputBytes,
     });
+    const compileMs = Math.round(performance.now() - compileStart);
 
     if (compile.timedOut) {
-      return { was_ok: false, errors: [`Compilation timed out after ${config.compileTimeoutMs}ms.`] };
+      return {
+        was_ok: false,
+        errors: [`Compilation timed out after ${config.compileTimeoutMs}ms.`],
+        compile_ms: compileMs,
+      };
     }
     if (compile.code !== 0) {
-      return { was_ok: false, errors: parseCompileError(compile.stderr) };
+      return { was_ok: false, errors: parseCompileError(compile.stderr), compile_ms: compileMs };
     }
 
     const binExists = await fs
@@ -98,6 +104,7 @@ export async function runYapProgram({ files, entry, input, flags }) {
           'Compilation reported success but produced no executable ' +
             '(check for backend flags that change the output mode, e.g. -bc).',
         ],
+        compile_ms: compileMs,
       };
     }
     await fs.chmod(binPath, 0o700);
@@ -117,30 +124,37 @@ export async function runYapProgram({ files, entry, input, flags }) {
       roBinds: [config.yapHome],
     });
 
+    const runStart = performance.now();
     const run = await runCapture(sandboxedRun.cmd, sandboxedRun.args, {
       cwd: workDir,
       stdin: input,
       timeoutMs: config.runTimeoutMs,
       maxBytes: config.maxOutputBytes,
     });
+    const runMs = Math.round(performance.now() - runStart);
+    const timings = { compile_ms: compileMs, run_ms: runMs };
 
     if (run.timedOut) {
-      return { was_ok: false, errors: [`Program timed out after ${config.runTimeoutMs}ms.`] };
+      return { was_ok: false, errors: [`Program timed out after ${config.runTimeoutMs}ms.`], ...timings };
     }
     if (run.outputExceeded) {
-      return { was_ok: false, errors: [`Program output exceeded the ${config.maxOutputBytes}-byte limit.`] };
+      return {
+        was_ok: false,
+        errors: [`Program output exceeded the ${config.maxOutputBytes}-byte limit.`],
+        ...timings,
+      };
     }
     if (run.signal) {
-      return { was_ok: false, errors: [`Program terminated by signal ${run.signal}.`] };
+      return { was_ok: false, errors: [`Program terminated by signal ${run.signal}.`], ...timings };
     }
     if (run.code !== 0) {
       const errors = [describeNonZeroExit(run.code)];
       const stderrText = run.stderr.trim();
       if (stderrText) errors.push(stderrText);
-      return { was_ok: false, errors };
+      return { was_ok: false, errors, ...timings };
     }
 
-    return { was_ok: true, output: run.stdout };
+    return { was_ok: true, output: run.stdout, ...timings };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
   }

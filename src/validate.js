@@ -12,18 +12,26 @@ export class ValidationError extends Error {}
 // arbitrary shared libraries), and -bc emits C instead of a binary (caught
 // separately after compilation, since it exits 0 with no binary produced).
 //
-// Flag *values* are restricted to a safe character set, not just "no
-// whitespace": yap forwards -bf=/-ff=/--backend-flag=/--frontend-flag=
-// values into its backend compiler invocation via a shell rather than a
-// plain execve argv, so `\S+`/`.+` let shell metacharacters through —
-// confirmed exploitable with `-bf=$(cat${IFS}/etc/passwd>&2)`, which reads
-// arbitrary sandbox-visible files (no literal space needed, `${IFS}`
-// expands to one). This isn't a bug we can fix in yap's C source from here,
-// so the flag value itself must never contain shell syntax.
-const SAFE_CHARS = '[A-Za-z0-9_.,+=/-]';
-const ALLOWED_FLAG_RE = new RegExp(
-  `^(-b${SAFE_CHARS}+|-f${SAFE_CHARS}*|--backend-flag=${SAFE_CHARS}+|--frontend-flag=${SAFE_CHARS}+)$`,
-);
+// This is an exact-match allowlist of complete flag tokens, deliberately NOT a
+// value pattern. An earlier version allowed any metacharacter-free value after
+// -b/-f/--backend-flag=/--frontend-flag=, but yap forwards those verbatim to
+// the backend C compiler, so that still admitted gcc flags that are themselves
+// code-execution or file primitives — -fplugin=<so>, -specs=<file>,
+// -wrapper=<prog>, -B<path>, -o<path>, -imacros<file> — none of which contain
+// shell syntax. (The raw-shell forwarding is also why `-bf=$(cat${IFS}/…)`
+// worked at all.) A public playground only needs to pick an optimization level
+// and the backend C compiler, so only those exact tokens are accepted; anything
+// that forwards an arbitrary flag to gcc is gone.
+const ALLOWED_FLAGS = new Set([
+  '-bO0',
+  '-bO1',
+  '-bO2',
+  '-bO3',
+  '-bOs',
+  '-bcc=gcc',
+  '-bcc=clang',
+  '-bcc=tcc',
+]);
 
 function isPlainObject(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -113,10 +121,11 @@ export function validateRunRequest(body) {
       if (typeof flag !== 'string') {
         throw new ValidationError('Every entry in "flags" must be a string.');
       }
-      if (!ALLOWED_FLAG_RE.test(flag)) {
+      if (!ALLOWED_FLAGS.has(flag)) {
         throw new ValidationError(
-          `Flag not allowed: "${flag}". Only backend/frontend flags are accepted ` +
-            '(e.g. "-bO2", "-bcc=clang", "-bf=-Wall", "--backend-flag=...", "--frontend-flag=...").',
+          `Flag not allowed: "${flag}". Accepted flags: optimization level ` +
+            '(-bO0, -bO1, -bO2, -bO3, -bOs) or backend C compiler ' +
+            '(-bcc=gcc, -bcc=clang, -bcc=tcc).',
         );
       }
     }
