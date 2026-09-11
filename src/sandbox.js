@@ -29,10 +29,18 @@ export function sandboxCommand(cmd, args, { workDir, roBinds = [] }) {
     return { cmd, args };
   }
 
+  // Mounting a fresh procfs needs privileges the process does not have when it
+  // is itself already inside a VM guest container (bwrap fails with "Can't
+  // mount proc on /newroot/proc"), so that deployment binds the guest's /proc
+  // read-only instead. Seeing the guest's own processes is not a leak there:
+  // the guest exists only to run this service.
+  const procArgs =
+    config.sandboxProcMode === 'bind' ? ['--ro-bind', '/proc', '/proc'] : ['--proc', '/proc'];
+
   const bwrapArgs = [
     '--unshare-all',
     '--die-with-parent',
-    '--proc', '/proc',
+    ...procArgs,
     '--dev', '/dev',
     '--tmpfs', '/tmp',
     '--ro-bind', '/nix', '/nix',

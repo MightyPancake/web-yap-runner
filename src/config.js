@@ -71,6 +71,10 @@ export const config = {
   sandboxEnabled: process.env.YAP_SANDBOX !== '0',
   bwrapBin: process.env.YAP_BWRAP_BIN || 'bwrap',
 
+  // "new" mounts a private procfs in the sandbox; "bind" binds the host's
+  // /proc read-only, which is what the in-VM deployment needs (see sandbox.js).
+  sandboxProcMode: process.env.YAP_SANDBOX_PROC === 'bind' ? 'bind' : 'new',
+
   // Caps on captured output so a runaway program can't exhaust server memory.
   maxOutputBytes: intFromEnv('YAP_MAX_OUTPUT_BYTES', 1024 * 1024),
   maxInputBytes: intFromEnv('YAP_MAX_INPUT_BYTES', 1024 * 1024),
