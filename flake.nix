@@ -26,6 +26,10 @@
               # Sandboxes the yap compiler (comptime macros run via TCC during
               # compilation) and the compiled program it produces.
               bubblewrap
+              # Runs the Cloudflare Tunnel exposing this as yap.nullptr.free
+              # (see cloudflared.yml and the cloudflared-yap-nullptr.service
+              # systemd unit).
+              cloudflared
             ];
           };
         });

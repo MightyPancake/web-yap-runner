@@ -1,0 +1,7 @@
+tunnel: yap-nullptr
+credentials-file: /home/mightypancake/.cloudflared/3f848896-f7eb-4fdd-b851-8dc224be97bc.json
+
+ingress:
+  - hostname: yap.nullptr.free
+    service: http://localhost:25116
+  - service: http_status:404
