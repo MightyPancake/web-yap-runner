@@ -12,6 +12,17 @@ import { config } from './config.js';
  * the dynamic linker live under /nix/store, and TCC's include-path discovery
  * (components/yap-c/src/build_state.c) shells out via popen() — which
  * hardcodes /bin/sh — to ask gcc for its default search paths.
+ *
+ * `/etc` is bound wholesale (not just the specific files TCC/bash need)
+ * because trial and error showed narrower binds kept breaking in
+ * NixOS-specific ways. But unlike the rest of /etc, /etc/nixos is not part
+ * of the NixOS-managed environment.etc (it's not symlinked from
+ * /etc/static) — it's just the host's own plaintext system config
+ * (configuration.nix, hardware-configuration.nix), world-readable by
+ * default and irrelevant to compiling/running yap programs. A sandboxed
+ * yap program can otherwise just open() it, so it's masked out with an
+ * empty tmpfs mounted *after* the /etc bind (bwrap applies mounts in
+ * order, so the later mount wins for that path).
  */
 export function sandboxCommand(cmd, args, { workDir, roBinds = [] }) {
   if (!config.sandboxEnabled) {
@@ -27,6 +38,7 @@ export function sandboxCommand(cmd, args, { workDir, roBinds = [] }) {
     '--ro-bind', '/nix', '/nix',
     '--ro-bind-try', '/etc', '/etc',
     '--ro-bind-try', '/bin', '/bin',
+    '--tmpfs', '/etc/nixos',
   ];
   for (const p of roBinds) {
     bwrapArgs.push('--ro-bind', p, p);
