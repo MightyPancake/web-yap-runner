@@ -114,6 +114,6 @@ app.use((err, req, res, next) => {
   res.status(400).json({ was_ok: false, errors: [err.message || 'Invalid request.'] });
 });
 
-app.listen(config.port, () => {
-  console.log(`web-yap-runner listening on port ${config.port} (yap: ${config.yapBin})`);
+app.listen(config.port, config.host, () => {
+  console.log(`web-yap-runner listening on ${config.host}:${config.port} (yap: ${config.yapBin})`);
 });

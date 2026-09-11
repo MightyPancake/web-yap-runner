@@ -14,6 +14,11 @@ function intFromEnv(name, fallback) {
 export const config = {
   port: intFromEnv('PORT', 3000),
 
+  // Loopback by default: the only intended caller is the cloudflared process
+  // on this same host (see cloudflared.yml, which points at localhost), so
+  // there is no reason to accept connections from the rest of the LAN.
+  host: process.env.HOST || '127.0.0.1',
+
   // Path to the yap compiler binary. It's a self-contained copy (see
   // yap_compiler in the repo root) — yap resolves the "components/",
   // "modules/", "lib/" directories it needs from YAP_HOME below rather than
