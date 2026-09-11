@@ -21,10 +21,19 @@ function describeNonZeroExit(code) {
 }
 
 // `ulimit`, then `exec` so the limits apply to the actual target process
-// rather than the short-lived bash wrapping it.
+// rather than the short-lived shell wrapping it.
+//
+// Uses `sh`, not `bash`: inside the bwrap sandbox, a bare `bash` ends up
+// with some other PATH entirely (NixOS-default-looking paths like
+// /run/current-system/sw/bin, which isn't even bound into the sandbox)
+// instead of the one actually passed to it, while `sh` (the very same
+// underlying binary, just invoked under that name) reliably keeps the PATH
+// it's given. Confirmed by direct testing; root cause not fully identified,
+// but it's consistent and `sh` is all `ulimit`+`exec` need anyway (both are
+// POSIX builtins).
 function ulimited(cpuSeconds, memoryKb, maxProcesses, cmd, args) {
   const script = `ulimit -t ${cpuSeconds} -v ${memoryKb} -u ${maxProcesses} 2>/dev/null; exec "$0" "$@"`;
-  return ['bash', ['-c', script, cmd, ...args]];
+  return ['sh', ['-c', script, cmd, ...args]];
 }
 
 function parseCompileError(stderr) {

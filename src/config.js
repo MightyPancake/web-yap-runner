@@ -35,14 +35,26 @@ export const config = {
   // own ulimits too — roomier than the run step's, since a real compile
   // (gcc -O2 on generated C, TCC in-process) needs more headroom than a
   // toy program.
+  //
+  // *MaxProcesses maps to `ulimit -u` (RLIMIT_NPROC), which the kernel
+  // enforces per REAL UID, system-wide — it is NOT scoped to bwrap's PID
+  // namespace or this process's own tree. On a shared desktop/dev machine
+  // where the same user also runs a browser, IDE, etc., the *ambient*
+  // process count can already be in the hundreds, so a low value here
+  // doesn't bound the sandboxed program at all — it just spuriously fails
+  // forks inside the sandbox (e.g. TCC's own popen() calls) the moment the
+  // host's ordinary usage happens to push the total over the limit. Keep
+  // this well above the host's normal process count; it's a backstop
+  // against a real fork bomb, not a tight per-request cap (that's what the
+  // concurrency limiter in server.js is for).
   compileCpuSeconds: intFromEnv('YAP_COMPILE_CPU_SECONDS', 20),
   compileMemoryKb: intFromEnv('YAP_COMPILE_MEMORY_KB', 1024 * 1024),
-  compileMaxProcesses: intFromEnv('YAP_COMPILE_MAX_PROCESSES', 64),
+  compileMaxProcesses: intFromEnv('YAP_COMPILE_MAX_PROCESSES', 2048),
 
   // Resource limits applied (via `ulimit`) to the compiled program's process.
   runCpuSeconds: intFromEnv('YAP_RUN_CPU_SECONDS', 5),
   runMemoryKb: intFromEnv('YAP_RUN_MEMORY_KB', 256 * 1024),
-  runMaxProcesses: intFromEnv('YAP_RUN_MAX_PROCESSES', 32),
+  runMaxProcesses: intFromEnv('YAP_RUN_MAX_PROCESSES', 2048),
 
   // Sandbox both the compiler and the compiled program with bubblewrap
   // (namespace isolation: no network, no view of the host's processes,
@@ -71,7 +83,7 @@ export const config = {
   // bar for casual drive-by use), per-IP rate limiting, and a global
   // concurrency cap (each request compiles+runs native code, which is real
   // CPU/memory cost regardless of how many distinct IPs it comes from).
-  corsOrigin: process.env.YAP_CORS_ORIGIN || 'https://giorgio.nullptr.free',
+  corsOrigin: process.env.YAP_CORS_ORIGIN || 'https://nullptr.free',
   rateLimitWindowMs: intFromEnv('YAP_RATE_LIMIT_WINDOW_MS', 60_000),
   rateLimitMax: intFromEnv('YAP_RATE_LIMIT_MAX', 20),
   maxConcurrentRuns: intFromEnv('YAP_MAX_CONCURRENT_RUNS', 4),

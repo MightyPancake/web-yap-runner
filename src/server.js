@@ -34,7 +34,12 @@ if (config.sandboxEnabled) {
 }
 
 const app = express();
-app.set('trust proxy', true);
+// Trust exactly one upstream hop (cloudflared, the only proxy in front of
+// this process) so the rate limiter keys off the real client IP from
+// X-Forwarded-For. `true` (trust any number of hops) is unsafe here —
+// express-rate-limit refuses to start with it, since it'd let a client
+// spoof its own rate-limit key.
+app.set('trust proxy', 1);
 
 // The caller is a static site calling this directly from browser JS, so a
 // CORS allowlist is what actually applies here (unlike an API key, which
