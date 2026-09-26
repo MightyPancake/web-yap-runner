@@ -42,7 +42,7 @@ Request body:
 ```json
 {
   "files": [
-    { "name": "main.yp", "content": "import io\n\ni32 fn main() {\n    io->print:(c\"Hello, world!\");\n    ret 0;\n}\n" }
+    { "name": "main.yp", "content": "import io\n\ni32 fn main() {\n    io->printf:(c\"Hello, world!\");\n    ret 0;\n}\n" }
   ],
   "input": "",
   "flags": ["-bO2"]

@@ -99,7 +99,7 @@ check_status() {
 
 echo "${BOLD}1) Hello world${RESET}"
 request '{
-  "files": [{"name": "main.yp", "content": "import io\n\ni32 fn main() {\n    io->print:(c\"Hello, world!\");\n    ret 0;\n}\n"}]
+  "files": [{"name": "main.yp", "content": "import io\n\ni32 fn main() {\n    io->printf:(c\"Hello, world!\");\n    ret 0;\n}\n"}]
 }'
 check "compiles and runs"        '.was_ok == true'
 check "stdout is exactly right"  '.output == "Hello, world!"'
@@ -117,7 +117,7 @@ echo
 echo "${BOLD}3) Multi-file program (local import)${RESET}"
 request '{
   "files": [
-    {"name": "main.yp", "content": "import io\nimport \"./helper.yp\"\n\ni32 fn main() {\n    io->print:(c\"sum via helper: \");\n    ret 0;\n}\n"},
+    {"name": "main.yp", "content": "import io\nimport \"./helper.yp\"\n\ni32 fn main() {\n    io->printf:(c\"sum via helper: \");\n    ret 0;\n}\n"},
     {"name": "helper.yp", "content": "fn helper(){}\n"}
   ]
 }'
@@ -126,7 +126,7 @@ echo
 
 echo "${BOLD}4) Compile error is reported cleanly${RESET}"
 request '{
-  "files": [{"name": "main.yp", "content": "import io\n\ni32 fn main() {\n    io->print:(c\"Hello\"\n    ret 0;\n}\n"}]
+  "files": [{"name": "main.yp", "content": "import io\n\ni32 fn main() {\n    io->printf:(c\"Hello\"\n    ret 0;\n}\n"}]
 }'
 check "reports failure"            '.was_ok == false'
 check "error message is useful"    '.errors[0] | contains("Syntax error")'
