@@ -2,13 +2,10 @@ tunnel: yap-nullptr
 credentials-file: /home/mightypancake/.cloudflared/2cc7e00d-fcc8-4011-9fff-f0f1c9dafa65.json
 
 ingress:
-  # run-yap.nullptr.free is this API's own hostname. yap.nullptr.free is
-  # listed too only for the migration window — the static site
-  # (MightyPancake/yapsite, GitHub Pages) takes that hostname, at which
-  # point this second entry goes away and the DNS record is released to
-  # the zone's *.nullptr.free wildcard.
+  # run-yap.nullptr.free is this API's own hostname. yap.nullptr.free used to
+  # point here too; it is the yap language site on GitHub Pages now
+  # (MightyPancake/yapsite), reached through the zone's *.nullptr.free
+  # wildcard, so nothing on that name arrives here any more.
   - hostname: run-yap.nullptr.free
-    service: http://localhost:25116
-  - hostname: yap.nullptr.free
     service: http://localhost:25116
   - service: http_status:404
