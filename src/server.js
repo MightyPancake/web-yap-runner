@@ -47,7 +47,17 @@ app.set('trust proxy', 1);
 // it doesn't stop a direct curl/script — so it's one layer among several,
 // not the real access control.
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', config.corsOrigin);
+  // Only one origin may be named per response, so echo back the caller's
+  // own Origin when it's on the allowlist (config.corsOrigins). A
+  // non-allowlisted or absent Origin gets the first entry, which simply
+  // fails the browser's own check the same way the old single value did.
+  // The `Vary: Origin` below is what stops a cache handing one origin's
+  // header to another.
+  const origin = req.headers.origin;
+  res.setHeader(
+    'Access-Control-Allow-Origin',
+    origin && config.corsOrigins.includes(origin) ? origin : config.corsOrigins[0],
+  );
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

@@ -92,7 +92,15 @@ export const config = {
   // bar for casual drive-by use), per-IP rate limiting, and a global
   // concurrency cap (each request compiles+runs native code, which is real
   // CPU/memory cost regardless of how many distinct IPs it comes from).
-  corsOrigin: process.env.YAP_CORS_ORIGIN || 'https://nullptr.free',
+  // Comma-separated allowlist rather than one value: the playground is
+  // served from more than one origin now (nullptr.free/play and the yap
+  // site at yap.nullptr.free), and a CORS response may name exactly one
+  // origin — so server.js echoes back whichever of these the request
+  // actually came from instead of a single baked-in site.
+  corsOrigins: (process.env.YAP_CORS_ORIGIN || 'https://nullptr.free')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
   rateLimitWindowMs: intFromEnv('YAP_RATE_LIMIT_WINDOW_MS', 60_000),
   rateLimitMax: intFromEnv('YAP_RATE_LIMIT_MAX', 20),
   maxConcurrentRuns: intFromEnv('YAP_MAX_CONCURRENT_RUNS', 4),
