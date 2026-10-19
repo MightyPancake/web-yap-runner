@@ -97,7 +97,10 @@ export const config = {
   // site at yap.nullptr.free), and a CORS response may name exactly one
   // origin — so server.js echoes back whichever of these the request
   // actually came from instead of a single baked-in site.
-  corsOrigins: (process.env.YAP_CORS_ORIGIN || 'https://nullptr.free')
+  // Both of this runner's real callers are listed by default, so deploying it
+  // needs no environment at all. YAP_CORS_ORIGIN stays as an override for
+  // anyone running it somewhere else.
+  corsOrigins: (process.env.YAP_CORS_ORIGIN || 'https://nullptr.free,https://yap.nullptr.free')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean),
