@@ -53,6 +53,23 @@ async function writeFiles(rootDir, files) {
   }
 }
 
+// A module registry entry is often a symlink out of YAP_HOME rather than a directory in
+// it -- modules/laydoh and modules/raylib both point at their own checkouts. The sandbox
+// binds YAP_HOME, so unless whatever those links resolve to is bound too they dangle
+// inside it, and the compile fails with an unresolved import rather than anything that
+// names the real cause.
+async function linkedModuleBinds() {
+  const modulesDir = path.join(config.yapHome, 'modules');
+  const entries = await fs.readdir(modulesDir, { withFileTypes: true }).catch(() => []);
+  const binds = [];
+  for (const entry of entries) {
+    if (!entry.isSymbolicLink()) continue;
+    const target = await fs.realpath(path.join(modulesDir, entry.name)).catch(() => null);
+    if (target && !target.startsWith(config.yapHome)) binds.push(target);
+  }
+  return binds;
+}
+
 export async function runYapProgram({ files, entry, input, flags }) {
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'yap-run-'));
   try {
@@ -70,7 +87,7 @@ export async function runYapProgram({ files, entry, input, flags }) {
     );
     const sandboxedCompile = sandboxCommand(compileCmd, compileArgsUlimited, {
       workDir,
-      roBinds: [config.yapHome, config.yapBin],
+      roBinds: [config.yapHome, config.yapBin, ...(await linkedModuleBinds())],
     });
 
     const compileStart = performance.now();
@@ -121,7 +138,7 @@ export async function runYapProgram({ files, entry, input, flags }) {
     // modules/io/libio.so) by absolute path under YAP_HOME.
     const sandboxedRun = sandboxCommand(runCmd, runArgsUlimited, {
       workDir,
-      roBinds: [config.yapHome],
+      roBinds: [config.yapHome, ...(await linkedModuleBinds())],
     });
 
     const runStart = performance.now();
