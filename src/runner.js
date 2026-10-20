@@ -46,13 +46,18 @@ function ulimited(cpuSeconds, memoryKb, maxProcesses, cmd, args) {
   return ['sh', ['-c', script, cmd, ...args]];
 }
 
-function parseCompileError(stderr) {
-  const cleaned = stripAnsi(stderr).trim();
-  if (!cleaned) return ['yap exited with an error but produced no diagnostic output.'];
+// yap writes its own diagnostic to stderr, but the backend C compiler's output -- the
+// part that says what actually went wrong -- it collects and prints to stdout (see the
+// popen block in components/yap-c/src/codegen.c, which buffers gcc/emcc and dumps it
+// there on failure). Reporting stderr alone left a failed emcc build saying nothing
+// but its exit code, which is no use to whoever has to fix it.
+function parseCompileError({ stdout, stderr }) {
   // The compiler stops at the first error and prints one "Error in <file> at
   // <line>:<col>" block (message + source snippet). Kept as a single entry
   // since there is currently never more than one per invocation.
-  return [cleaned];
+  const parts = [stripAnsi(stderr), stripAnsi(stdout)].map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) return ['yap exited with an error but produced no diagnostic output.'];
+  return [parts.join('\n\n')];
 }
 
 async function writeFiles(rootDir, files) {
@@ -135,7 +140,7 @@ export async function runYapProgram({ files, entry, input, flags }) {
       };
     }
     if (compile.code !== 0) {
-      return { was_ok: false, errors: parseCompileError(compile.stderr), compile_ms: compileMs };
+      return { was_ok: false, errors: parseCompileError(compile), compile_ms: compileMs };
     }
 
     const binExists = await fs
@@ -295,7 +300,7 @@ export async function buildRaylibProgram({ files, entry, flags }) {
       };
     }
     if (compile.code !== 0) {
-      return { was_ok: false, errors: parseCompileError(compile.stderr), compile_ms: compileMs };
+      return { was_ok: false, errors: parseCompileError(compile), compile_ms: compileMs };
     }
 
     const js = await fs.readFile(outPath, 'utf8').catch(() => null);
