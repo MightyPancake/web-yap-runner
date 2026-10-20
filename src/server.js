@@ -5,7 +5,7 @@ import path from 'node:path';
 import { rateLimit } from 'express-rate-limit';
 import { config } from './config.js';
 import { ValidationError, validateRunRequest } from './validate.js';
-import { runYapProgram } from './runner.js';
+import { buildRaylibProgram, runYapProgram } from './runner.js';
 
 if (!fs.existsSync(config.yapBin)) {
   console.error(
@@ -19,6 +19,12 @@ if (!fs.existsSync(path.join(config.yapHome, 'components'))) {
       'Set YAP_HOME to a yap checkout/install that has been built (components/, modules/, lib/).',
   );
   process.exit(1);
+}
+if (!config.emCache) {
+  console.warn(
+    'YAP_EM_CACHE is unset: raylib builds will be refused (everything else still works). ' +
+      'See the README for warming an emscripten cache.',
+  );
 }
 if (config.sandboxEnabled) {
   try {
@@ -105,7 +111,8 @@ app.post('/run', async (req, res) => {
 
   inFlight++;
   try {
-    const result = await runYapProgram(request);
+    const result =
+      request.mode === 'raylib' ? await buildRaylibProgram(request) : await runYapProgram(request);
     res.status(200).json(result);
   } catch (err) {
     console.error('Unexpected error running yap program:', err);

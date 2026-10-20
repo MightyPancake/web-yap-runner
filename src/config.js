@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +11,20 @@ function intFromEnv(name, fallback) {
   if (!raw) return fallback;
   const n = Number.parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+
+// Looked up once, at startup: the raylib mode needs an absolute path to hand the
+// sandbox, and `emcc` on PATH is usually a symlink chain into the store.
+function resolveEmcc() {
+  const named = process.env.YAP_EMCC;
+  try {
+    if (named) return fs.realpathSync(named);
+    const found = execFileSync('sh', ['-c', 'command -v emcc'], { encoding: 'utf8' }).trim();
+    return found ? fs.realpathSync(found) : null;
+  } catch {
+    return null;
+  }
 }
 
 export const config = {
@@ -34,6 +50,31 @@ export const config = {
   // Wall-clock timeouts.
   compileTimeoutMs: intFromEnv('YAP_COMPILE_TIMEOUT_MS', 15_000),
   runTimeoutMs: intFromEnv('YAP_RUN_TIMEOUT_MS', 10_000),
+
+  // raylib builds get their own, much roomier budget: emcc links through Binaryen and
+  // instruments the whole module for Asyncify, which measures around 10s for a trivial
+  // program on a warm cache where gcc takes a fraction of a second. There is no run
+  // step to pay for afterwards, though -- the program runs in the caller's browser.
+  raylibCompileTimeoutMs: intFromEnv('YAP_RAYLIB_COMPILE_TIMEOUT_MS', 60_000),
+
+  // And its own CPU budget, for the same reason: an emcc build fans out across several
+  // processes and spends real CPU in Binaryen, where the native path spends a fraction
+  // of a second in gcc. There is deliberately no memory limit to go with it -- see the
+  // note on `ulimit -v` and V8 in runner.js.
+  raylibCompileCpuSeconds: intFromEnv('YAP_RAYLIB_COMPILE_CPU_SECONDS', 120),
+
+  // The emcc the raylib mode builds with, resolved through its symlinks so the path
+  // lands where the sandbox can actually see it: bwrap binds /nix, but not the
+  // /run/current-system/sw/bin symlink farm a NixOS PATH is made of, so the unresolved
+  // name is simply absent inside the sandbox (an exit code of 127 from the backend).
+  emccBin: resolveEmcc(),
+
+  // Prebuilt emscripten cache (libc.a and friends), bound read-only into the sandbox
+  // and used with EM_FROZEN_CACHE=1 so emcc never tries to write to it. Unset means
+  // this server does not serve raylib builds at all: there is no sane default, since a
+  // cold cache would have every request rebuilding system libraries inside a sandbox
+  // that cannot keep the result. See the README for warming it.
+  emCache: process.env.YAP_EM_CACHE || null,
 
   // yap's comptime macros execute arbitrary code via an embedded TCC during
   // compilation itself (not just at runtime), so the compile step gets its

@@ -59,6 +59,9 @@ Request body:
   tuning flags are accepted (`-b...`, `-f...`, `--backend-flag=...`, `--frontend-flag=...`),
   e.g. `-bO2`, `-bcc=clang`, `-bf=-Wall`. Flags that change the compiler's mode of
   operation (`-o`, `-g`, `-r`, `-s`, `-c`, `-C`, `-h`) are rejected.
+- `mode` (optional string, default `"native"`): `"native"` compiles and runs the program
+  here and returns what it printed. `"raylib"` compiles it to wasm with emcc and returns
+  the JavaScript instead, for the caller to run on a canvas of its own — see below.
 
 Response body, on success:
 
@@ -71,6 +74,66 @@ On a compile error, runtime crash, non-zero exit, or timeout:
 ```json
 { "was_ok": false, "errors": ["Error in main.yp at 4:4\n  ..."] }
 ```
+
+### `mode: "raylib"`
+
+A raylib program opens a GL window, and this server has no display and would have
+nothing to capture if it did. So that mode compiles rather than runs, and the program
+runs in the caller's browser:
+
+```json
+{ "was_ok": true, "js": "<the whole program>", "export_name": "createRaylibModule", "compile_ms": 681 }
+```
+
+`js` is a complete, self-contained emscripten build (`-sSINGLE_FILE=1`, so the wasm is
+embedded in it) exporting a factory under `export_name`. The caller runs it by eval'ing
+the code somewhere isolated and calling that factory with a canvas:
+
+```js
+createRaylibModule({ canvas: document.getElementById('canvas') });
+```
+
+The flag set is fixed server-side in `RAYLIB_FLAGS` (`src/runner.js`) and not accepted
+from the request: `-bf=` forwards its value verbatim to the backend C compiler, which is
+the hole the exact-match allowlist in `src/validate.js` exists to close. `-bcc=` is
+rejected in this mode for the same reason — the mode *is* "build with emcc".
+
+The load this puts on the server is different in kind from `/run`: one emcc build (which
+is slow — Asyncify instrumentation and a Binaryen link, so tens of seconds at `-bO2`
+against a fraction of a second for gcc) and then nothing at all, where `/run` pays for
+every second the program is alive. It has its own timeout and CPU budget
+(`YAP_RAYLIB_COMPILE_TIMEOUT_MS`, `YAP_RAYLIB_COMPILE_CPU_SECONDS`) and deliberately no
+memory limit — see the note on `ulimit -v` and V8 in `src/runner.js`.
+
+### Setting up raylib builds
+
+Three things have to be true, and the mode refuses the request with a message rather than
+failing obscurely if the first two are not:
+
+1. **emcc on PATH** (or `YAP_EMCC` pointing at it). It is resolved through its symlinks at
+   startup, because the sandbox binds `/nix` but not the `/run/current-system/sw/bin`
+   symlink farm a NixOS PATH is made of.
+
+2. **A warmed emscripten cache in `YAP_EM_CACHE`.** It is bound read-only into the
+   sandbox and used with `EM_FROZEN_CACHE=1`, so emcc never writes to it — which means
+   everything it needs has to be there already. Warm it once, outside the sandbox, by
+   building anything with the same flags:
+
+   ```sh
+   export YAP_EM_CACHE=/var/lib/web-yap-runner/emcache
+   EM_CACHE=$YAP_EM_CACHE emcc -sUSE_GLFW=3 -sASYNCIFY -sALLOW_MEMORY_GROWTH \
+     -sSINGLE_FILE=1 -xc /dev/null -o /tmp/warm.js
+   ```
+
+3. **The raylib module in `YAP_HOME/modules/raylib`**, with its wasm-flavored libraries
+   beside it: `libraylib_wasm.a` (the binding wrapper, built by `yap install`) and
+   `libraylibweb_wasm.a` (raylib itself, built for the web — `make wasm` in the
+   raylib-yap checkout). A native raylib build is *not* enough and is not interchangeable.
+
+   The entry may be a symlink to a checkout elsewhere, as `modules/laydoh` already is.
+   The sandbox binds `YAP_HOME`, so a link pointing outside it would dangle in there;
+   `linkedModuleBinds()` in `src/runner.js` resolves those links and binds their targets
+   too, which is also what makes a native program importing such a module work.
 
 ## Trying it out
 

@@ -58,7 +58,18 @@ export function validateRunRequest(body) {
     throw new ValidationError('Request body must be a JSON object.');
   }
 
-  const { files, input, flags, entry } = body;
+  const { files, input, flags, entry, mode } = body;
+
+  // "native" compiles and runs server-side, returning what the program printed.
+  // "raylib" compiles to wasm and returns the JavaScript, for the caller to run on a
+  // canvas of its own -- a GL window has nothing to say to a captured stdout.
+  let normalizedMode = 'native';
+  if (mode !== undefined) {
+    if (mode !== 'native' && mode !== 'raylib') {
+      throw new ValidationError(`Unknown mode: "${mode}". Accepted modes: "native", "raylib".`);
+    }
+    normalizedMode = mode;
+  }
 
   if (!Array.isArray(files) || files.length === 0) {
     throw new ValidationError('"files" must be a non-empty array.');
@@ -129,8 +140,25 @@ export function validateRunRequest(body) {
         );
       }
     }
+    // The backend C compiler is the server's call in raylib mode, not the caller's:
+    // the whole mode is defined by building through emcc with a fixed flag set
+    // (RAYLIB_FLAGS in runner.js), and a second -bcc= would just fight it.
+    if (normalizedMode === 'raylib') {
+      const picked = flags.find((f) => f.startsWith('-bcc='));
+      if (picked) {
+        throw new ValidationError(
+          `Flag not allowed in raylib mode: "${picked}". That mode always builds with emcc.`,
+        );
+      }
+    }
     normalizedFlags = flags;
   }
 
-  return { files: normalizedFiles, entry: entryName, input: stdin, flags: normalizedFlags };
+  return {
+    files: normalizedFiles,
+    entry: entryName,
+    input: stdin,
+    flags: normalizedFlags,
+    mode: normalizedMode,
+  };
 }
